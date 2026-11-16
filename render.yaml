@@ -15,4 +15,4 @@ services:
       - key: FREEDOMGPT_ACCESS_TOKEN
         generateValue: true
       - key: OPENAI_MODEL
-        value: gpt-5.5
+        value: gpt-6-luna
