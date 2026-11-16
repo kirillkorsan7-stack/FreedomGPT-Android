@@ -6,8 +6,9 @@ Native Android starter for FreedomGPT.
 
 - Kotlin + Jetpack Compose chat interface.
 - Conversation history saved locally on the Android device.
-- Settings screen for an HTTPS backend URL.
-- Android sends chat messages to the backend; the provider API key stays on the backend.
+- Settings screen for an HTTPS backend URL and a separate server access token.
+- Android sends chat messages with a bearer access token; the provider API key stays on the backend.
+- Render Blueprint (`render.yaml`) for backend setup.
 - Node.js backend using the OpenAI Responses API.
 - GitHub Actions debug APK build.
 
@@ -19,13 +20,13 @@ The provider API may incur usage charges. Since you are under 18, ask a parent o
 
 ## Backend setup
 
-1. Deploy the `backend` folder as a Node.js web service on a hosting provider that supports Node 20+.
-2. Set `OPENAI_API_KEY` in that provider's private environment-variable/secret settings. Optionally set `OPENAI_MODEL` (default: `gpt-5.5`).
-3. Keep the key out of this repository and out of the Android app.
-4. Once deployed, copy the HTTPS service address and append `/chat`.
-5. In FreedomGPT, open Settings and paste that HTTPS `/chat` address.
+1. In Render, create a new Blueprint from this GitHub repository and apply `render.yaml`.
+2. In the private environment settings, provide `OPENAI_API_KEY`. Render generates `FREEDOMGPT_ACCESS_TOKEN` for the service.
+3. Keep both values private. Never put `OPENAI_API_KEY` in this repository or the Android app.
+4. After deployment, copy the service's HTTPS address and append `/chat`.
+5. In FreedomGPT Settings, paste the HTTPS `/chat` address and the generated server access token.
 
-The backend includes basic request validation and a simple per-IP rate limit. It is a prototype, not a production-hardened public service. Before public release, add proper user authentication, durable rate limiting, monitoring, and privacy controls.
+The backend includes basic request validation, a simple per-IP rate limit, and a bearer-token gate. This token is a basic barrier for personal testing only: it is stored on the phone and can be extracted from the app/device. Do not treat this prototype as secure for public release. Before public release, add real user authentication, durable rate limiting, monitoring, and privacy controls. Render's free service may sleep when idle, so the first request can be delayed.
 
 ## Build APK
 
