@@ -58,6 +58,12 @@ class MainActivity : ComponentActivity() {
                 },
                 saveEndpoint = { endpoint ->
                     getSharedPreferences("freedomgpt", MODE_PRIVATE).edit().putString("endpoint", endpoint).apply()
+                },
+                loadAccessToken = {
+                    getSharedPreferences("freedomgpt", MODE_PRIVATE).getString("access_token", "") ?: ""
+                },
+                saveAccessToken = { token ->
+                    getSharedPreferences("freedomgpt", MODE_PRIVATE).edit().putString("access_token", token).apply()
                 }
             )
         }
@@ -69,12 +75,16 @@ fun FreedomGPTApp(
     loadHistory: () -> List<ChatMessage>,
     saveHistory: (List<ChatMessage>) -> Unit,
     loadEndpoint: () -> String,
-    saveEndpoint: (String) -> Unit
+    saveEndpoint: (String) -> Unit,
+    loadAccessToken: () -> String,
+    saveAccessToken: (String) -> Unit
 ) {
     var draft by remember { mutableStateOf("") }
     var messages by remember { mutableStateOf(loadHistory()) }
     var endpoint by remember { mutableStateOf(loadEndpoint()) }
     var endpointDraft by remember { mutableStateOf(endpoint) }
+    var accessToken by remember { mutableStateOf(loadAccessToken()) }
+    var accessTokenDraft by remember { mutableStateOf(accessToken) }
     var showSettings by remember { mutableStateOf(false) }
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -89,7 +99,7 @@ fun FreedomGPTApp(
                     Text("FreedomGPT", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text(if (endpoint.isBlank()) "Локальная история • AI не подключён" else "AI-сервер настроен", color = Color(0xFFAAAAB8), fontSize = 12.sp)
                 }
-                IconButton(onClick = { showSettings = true; endpointDraft = endpoint }) {
+                IconButton(onClick = { showSettings = true; endpointDraft = endpoint; accessTokenDraft = accessToken }) {
                     Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Color.White)
                 }
                 IconButton(onClick = { messages = emptyList(); error = null }) {
@@ -124,7 +134,7 @@ fun FreedomGPTApp(
                             sending = true
                             scope.launch {
                                 try {
-                                    val answer = requestFreedomGpt(endpoint, updated)
+                                    val answer = requestFreedomGpt(endpoint, accessToken, updated)
                                     messages = messages + ChatMessage(answer, false)
                                 } catch (e: Exception) {
                                     error = e.message ?: "Не удалось связаться с сервером."
@@ -144,14 +154,18 @@ fun FreedomGPTApp(
                 title = { Text("Подключение AI-сервера") },
                 text = {
                     Column {
-                        Text("Вставь HTTPS-адрес backend-сервера, заканчивающийся на /chat. API-ключ сюда не вводи.", fontSize = 13.sp)
+                        Text("Вставь HTTPS-адрес сервера /chat и токен доступа из настроек хостинга. API-ключ сюда не вводи.", fontSize = 13.sp)
                         Spacer(Modifier.height(10.dp))
                         OutlinedTextField(value = endpointDraft, onValueChange = { endpointDraft = it }, label = { Text("Адрес сервера") }, singleLine = true)
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(value = accessTokenDraft, onValueChange = { accessTokenDraft = it }, label = { Text("Токен доступа сервера") }, singleLine = true)
                     }
                 },
                 confirmButton = { TextButton(onClick = {
                     endpoint = endpointDraft.trim().trimEnd('/')
                     saveEndpoint(endpoint)
+                    accessToken = accessTokenDraft.trim()
+                    saveAccessToken(accessToken)
                     showSettings = false
                 }) { Text("Сохранить") } },
                 dismissButton = { TextButton(onClick = { showSettings = false }) { Text("Отмена") } }
@@ -160,7 +174,7 @@ fun FreedomGPTApp(
     }
 }
 
-private suspend fun requestFreedomGpt(endpoint: String, messages: List<ChatMessage>): String = withContext(Dispatchers.IO) {
+private suspend fun requestFreedomGpt(endpoint: String, accessToken: String, messages: List<ChatMessage>): String = withContext(Dispatchers.IO) {
     val url = URL(endpoint)
     require(url.protocol == "https") { "Для безопасности нужен HTTPS-адрес сервера." }
     val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -169,6 +183,7 @@ private suspend fun requestFreedomGpt(endpoint: String, messages: List<ChatMessa
         readTimeout = 90000
         doOutput = true
         setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        setRequestProperty("Authorization", "Bearer $accessToken")
     }
     try {
         val items = JSONArray()
