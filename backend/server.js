@@ -1,7 +1,9 @@
 const http = require("node:http");
+const { timingSafeEqual } = require("node:crypto");
 
 const PORT = Number(process.env.PORT || 8080);
 const API_KEY = process.env.OPENAI_API_KEY;
+const ACCESS_TOKEN = process.env.FREEDOMGPT_ACCESS_TOKEN;
 const MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 20;
@@ -33,6 +35,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true });
   if (req.method !== "POST" || req.url !== "/chat") return send(res, 404, { error: "Not found" });
   if (!API_KEY) return send(res, 503, { error: "Server is missing OPENAI_API_KEY." });
+  if (!ACCESS_TOKEN) return send(res, 503, { error: "Server access token is not configured." });
+  const auth = req.headers.authorization || "";
+  const supplied = Buffer.from(auth.startsWith("Bearer ") ? auth.slice(7) : "");
+  const expected = Buffer.from(ACCESS_TOKEN);
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+    return send(res, 401, { error: "Unauthorized. Check the server access token in app settings." });
+  }
 
   const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
   const now = Date.now();
